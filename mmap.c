@@ -148,8 +148,6 @@ static int wrapfs_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	const struct vm_operations_struct *lower_vm_ops;
 	struct vm_area_struct lower_vma;
 
-	printk(KERN_INFO "In wrapfs_fault()");
-
 	memcpy(&lower_vma, vma, sizeof(struct vm_area_struct));
 	file = lower_vma.vm_file;
 	lower_vm_ops = WRAPFS_F(file)->lower_vm_ops;
@@ -213,7 +211,6 @@ out:
 static int wrapfs_writepage(struct page *page, struct writeback_control *wbc)
 {
     int rc =0;
-    printk(KERN_INFO "in wrapfs_writepage");
     SetPageUptodate(page);
     unlock_page(page);
     return rc;
@@ -222,8 +219,6 @@ static int wrapfs_writepage(struct page *page, struct writeback_control *wbc)
 static int wrapfs_readpage(struct file *file, struct page *page)
 {
 	int err=0;
-
-    printk(KERN_INFO "in wrapfs_readpage");
 
 	err = wrapfs_read_lower_page_segment(page, page->index, 0, PAGE_CACHE_SIZE, page->mapping->host, file);
 	if (err) {

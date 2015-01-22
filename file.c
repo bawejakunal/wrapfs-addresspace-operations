@@ -288,9 +288,7 @@ static int wrapfs_fasync(int fd, struct file *file, int flag)
 const struct file_operations wrapfs_main_mmap_fops = {
 	.llseek		= generic_file_llseek,
 	.read		= wrapfs_read,
-	.read 		= do_sync_read,
 	.write		= wrapfs_write,
-	.write 		= do_sync_write,
 	.aio_read	= generic_file_aio_read,
 	.aio_write	= generic_file_aio_write,
 	.unlocked_ioctl	= wrapfs_unlocked_ioctl,
