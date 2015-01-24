@@ -162,16 +162,9 @@ static int wrapfs_mmap(struct file *file, struct vm_area_struct *vma)
 	 * Next 3 lines are all I need from generic_file_mmap.  I definitely
 	 * don't want its test for ->readpage which returns -ENOEXEC.
 	 */
-	//file_accessed(file);
-	//vma->vm_ops = &wrapfs_vm_ops;
-	//vma->vm_flags |= VM_CAN_NONLINEAR;
-	file->f_mapping->a_ops = &wrapfs_aops;
-	err = generic_file_mmap(file,vma);
-	if (err) {
-		printk(KERN_ERR "wrapfs: generic_file_mmap failed %d", err);
-		goto out;
-	}
+	file_accessed(file);
 	vma->vm_ops = &wrapfs_vm_ops;
+	vma->vm_flags |= VM_CAN_NONLINEAR;
 
 	if(1 == WRAPFS_SB(file->f_dentry->d_sb)->mount_options.mmap)
 		file->f_mapping->a_ops = &wrapfs_aops; /* set our aops */
