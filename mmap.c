@@ -147,7 +147,7 @@ int wrapfs_write_lower_page_segment(struct inode *wrapfs_inode,
         return rc;
 }
 
-/*
+
 static int wrapfs_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	int err;
@@ -163,7 +163,7 @@ static int wrapfs_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	BUG_ON(!lower_vm_ops);
 
 	lower_file = wrapfs_lower_file(file);
-*/
+
 	/*
 	 * XXX: vm_ops->fault may be called in parallel.  Because we have to
 	 * resort to temporarily changing the vma->vm_file to point to the
@@ -174,12 +174,12 @@ static int wrapfs_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	 * better fix would be to change the calling semantics of ->fault to
 	 * take an explicit file pointer.
 	 */
-/*
+
 	lower_vma.vm_file = lower_file;
 	err = lower_vm_ops->fault(&lower_vma, vmf);
 	return err;
 }
-*/
+
 
 /**
  * wrapfs_writepage
@@ -426,8 +426,7 @@ const struct address_space_operations wrapfs_aops = {
         .bmap = wrapfs_bmap,
 };
 
-/*
+
 const struct vm_operations_struct wrapfs_vm_ops = {
 	.fault		= wrapfs_fault,
 };
-*/

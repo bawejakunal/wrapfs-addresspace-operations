@@ -20,7 +20,7 @@ static int wrapfs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 {
 	struct path lower_path, saved_path;
 	struct dentry *lower_dentry;
-	int err = 1;
+	int err = 1; //default is valid (1); invalid is 0.
 
 	if (nd && nd->flags & LOOKUP_RCU)
 		return -ECHILD;
