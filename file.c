@@ -12,6 +12,37 @@
 #include "wrapfs.h"
 #include <linux/string.h>
 
+/* Wrapper for generic_file_aio_read taken from ecryptfs to handle atime of lower inode */
+static ssize_t wrapfs_read_update_atime(struct kiocb *iocb,
+				const struct iovec *iov,
+				unsigned long nr_segs, loff_t pos)
+{
+	ssize_t rc;
+	struct dentry *lower_dentry;
+	struct vfsmount *lower_vfsmount;
+	struct file *file = iocb->ki_filp;
+	struct dentry *dentry = file->f_path.dentry;
+
+	printk(KERN_INFO "wrapfs_read_update_atime");
+
+	rc = generic_file_aio_read(iocb, iov, nr_segs, pos);
+	/*
+	 * Even though this is a async interface, we need to wait
+	 * for IO to finish to update atime
+	 */
+	if (-EIOCBQUEUED == rc)
+		rc = wait_on_sync_kiocb(iocb);
+	if (rc >= 0) {
+		//lower_dentry = ecryptfs_dentry_to_lower(file->f_path.dentry);
+		lower_dentry = WRAPFS_D(dentry)->lower_path.dentry;
+		//lower_vfsmount = ecryptfs_dentry_to_lower_mnt(file->f_path.dentry);
+		lower_vfsmount = WRAPFS_D(dentry)->lower_path.mnt;
+		touch_atime(lower_vfsmount, lower_dentry);
+	}
+	return rc;
+}
+
+
 static ssize_t wrapfs_read(struct file *file, char __user *buf,
 			   size_t count, loff_t *ppos)
 {
@@ -22,14 +53,22 @@ static ssize_t wrapfs_read(struct file *file, char __user *buf,
 	lower_file = wrapfs_lower_file(file);
 
 	if (1 == WRAPFS_SB(file->f_dentry->d_sb)->mount_options.mmap)
-			err = do_sync_read(file, buf, count, ppos);
+	{
+		printk(KERN_INFO "do_sync_read");
+		err = do_sync_read(file, buf, count, ppos);
+		/* 
+		 * In this case if do_sync_read succeeds
+		 * we need to update lower inode atime which is handled in wrapfs_read_update_atime
+		 */
+	}
 	else
+	{
 		err = vfs_read(lower_file, buf, count, ppos);
-
-	/* update our inode atime upon a successful lower read */
-	if (err >= 0)
-		fsstack_copy_attr_atime(dentry->d_inode,
-					lower_file->f_path.dentry->d_inode);
+		/* update our inode atime upon a successful lower read */
+		if (err >= 0)
+			fsstack_copy_attr_atime(dentry->d_inode,
+						lower_file->f_path.dentry->d_inode);
+	}
 
 	return err;
 }
@@ -44,16 +83,23 @@ static ssize_t wrapfs_write(struct file *file, const char __user *buf,
 	lower_file = wrapfs_lower_file(file);
 
 	if (1 == WRAPFS_SB(file->f_dentry->d_sb)->mount_options.mmap)
+	{
+		printk(KERN_INFO "do_sync_write");
 		err = do_sync_write(file, buf, count, ppos);
+		/* 
+		 * no inode update required here, handled in generic_file_aio_write
+		 */	
+	}
 	else
+	{
 		err = vfs_write(lower_file, buf, count, ppos);
-
-	/* update our inode times+sizes upon a successful lower write */
-	if (err >= 0) {
-		fsstack_copy_inode_size(dentry->d_inode,
-					lower_file->f_path.dentry->d_inode);
-		fsstack_copy_attr_times(dentry->d_inode,
-					lower_file->f_path.dentry->d_inode);
+		/* update our inode times+sizes upon a successful lower write */
+		if (err >= 0) {
+			fsstack_copy_inode_size(dentry->d_inode,
+						lower_file->f_path.dentry->d_inode);
+			fsstack_copy_attr_times(dentry->d_inode,
+						lower_file->f_path.dentry->d_inode);
+		}
 	}
 
 	return err;
@@ -166,10 +212,7 @@ static int wrapfs_mmap(struct file *file, struct vm_area_struct *vma)
 	vma->vm_ops = &wrapfs_vm_ops;
 	vma->vm_flags |= VM_CAN_NONLINEAR;
 
-	if(1 == WRAPFS_SB(file->f_dentry->d_sb)->mount_options.mmap)
-		file->f_mapping->a_ops = &wrapfs_aops; /* set our aops */
-	else
-		file->f_mapping->a_ops = &wrapfs_dummy_aops; /* set our aops */
+	file->f_mapping->a_ops = &wrapfs_dummy_aops; /* set our aops */
 
 	if (!WRAPFS_F(file)->lower_vm_ops) /* save for our ->fault */
 		WRAPFS_F(file)->lower_vm_ops = saved_vm_ops;
@@ -282,13 +325,13 @@ const struct file_operations wrapfs_main_mmap_fops = {
 	.llseek		= generic_file_llseek,
 	.read		= wrapfs_read,
 	.write		= wrapfs_write,
-	.aio_read	= generic_file_aio_read,
+	.aio_read	= wrapfs_read_update_atime,
 	.aio_write	= generic_file_aio_write,
 	.unlocked_ioctl	= wrapfs_unlocked_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl	= wrapfs_compat_ioctl,
 #endif
-	.mmap		= wrapfs_mmap,
+	.mmap 		= generic_file_mmap,
 	.open		= wrapfs_open,
 	.flush		= wrapfs_flush,
 	.release	= wrapfs_file_release,

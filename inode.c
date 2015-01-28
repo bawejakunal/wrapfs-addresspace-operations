@@ -11,6 +11,7 @@
 
 #include "wrapfs.h"
 
+/* creates a new file */
 static int wrapfs_create(struct inode *dir, struct dentry *dentry,
 			 int mode, struct nameidata *nd)
 {
